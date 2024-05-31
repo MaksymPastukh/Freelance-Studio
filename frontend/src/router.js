@@ -11,7 +11,6 @@ export class Router {
     this.adminlteStyleElement = document.getElementById('adminlte_style')
 
 
-
     this.initEvent()
 
     // Набор страниц со свойствами
@@ -43,6 +42,9 @@ export class Router {
           document.body.classList.add('login-page')
           new Login()
         },
+        unload: () => {
+          document.body.classList.remove('login-page')
+        },
         styles: ['icheck-bootstrap.min.css']
       },
       {
@@ -54,6 +56,9 @@ export class Router {
           document.body.classList.add('register-page')
           new SignUp()
         },
+        unload: () => {
+          document.body.classList.remove('register-page')
+        },
         styles: ['icheck-bootstrap.min.css']
       },
     ]
@@ -64,9 +69,55 @@ export class Router {
     window.addEventListener('DOMContentLoaded', this.activateRoute.bind(this))
     // Добавляем событие на отлов изменения url при переходе на другою страницу
     window.addEventListener('popstate', this.activateRoute.bind(this))
+    document.addEventListener('click', this.openNewRoute.bind(this))
+
   }
 
-  async activateRoute() {
+  async openNewRoute(e) {
+    let element = null
+    if (e.target.nodeName === 'A') {
+      element = e.target
+    } else if (e.target.parentNode.nodeName === 'A') {
+      element = e.target.parentNode
+    }
+
+    if (element) {
+      e.preventDefault()
+
+      const url = element.href.replace(window.location.origin, '')
+      if (!url || url === '/#' || url.startsWith('javascript:void(0)')) {
+        return
+      }
+
+      const currentRoute = window.location.pathname
+      history.pushState({}, '', url)
+      await this.activateRoute(null, currentRoute)
+    }
+  }
+
+
+  async activateRoute(e, oldRoute = null) {
+    // Проверка на предыдущую страницу
+    if(oldRoute) {
+      // Находим значения страницы с которой мы уходим
+      const currentRoute = this.routes.find(item => item.route === oldRoute)
+        // Очищаем не нужные свойства
+
+      if (currentRoute.styles && currentRoute.styles.length > 0) {
+        currentRoute.styles.forEach(style => {
+          document.querySelector(`link[href='/css/${style}']`).remove()
+        })
+      }
+
+      //Делаем проверку на то что в newRoute есть функция .unload и newRoute.unload есть function. Подгружаем функционал на страницу на которой мы находимся
+      if (currentRoute.unload && typeof currentRoute.load === 'function') {
+        // Вызываем функцию load
+        currentRoute.unload()
+      }
+
+
+    }
+
     // Определяем url какой открыл пользователь
     const urlRoute = window.location.pathname
     // Находим нужный роут
@@ -76,7 +127,7 @@ export class Router {
     // Если в newRoute пусто то мы перенаправляем на страницу 404
     if (newRoute) {
       // Проверяем если newRoute.styles есть данные, то мы обрабатываем эти данные в цикле и добавляем на страницу
-      if(newRoute.styles && newRoute.styles.length > 0) {
+      if (newRoute.styles && newRoute.styles.length > 0) {
         newRoute.styles.forEach(style => {
           const link = document.createElement('link')
           link.rel = 'stylesheet'
@@ -94,8 +145,7 @@ export class Router {
       }
       //Делаем проверку на то что в newRoute есть данные filePathTemplate. Подгружаем контент на страницу на которой мы находимся
       if (newRoute.filePathTemplate) {
-        // Очищаем все классы в body
-        document.body.className = ''
+
 
         // Переменная в которой храним значения контейнера
         let contentBlock = this.contentPageElement
@@ -128,7 +178,8 @@ export class Router {
       }
 
     } else {
-      window.location = '/404'
+      history.pushState({}, '', '/404')
+      await this.activateRoute()
     }
   }
 }
